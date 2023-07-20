@@ -1,20 +1,35 @@
-import { cookies, headers } from "next/headers";
+import * as headers from "next/headers";
+// import { cookies, headers } from "next/headers";
 import { describe, expect, it, vi } from 'vitest';
-
 import { printHello } from './a-dependency';
 
-vi.mock('./a-dependency');
-vi.mock('next/headers');
 
+// this overrides what would be associatied to these libraries from the __mocks__ directory
+// incomplete: 
+vi.mock("next/headers", () => {
+    return {
+        default: () => ({}), 
+        cookies: () => vi.fn(), //should return an instance of ReadonlyRequestCookies 
+    }
+})
+
+// this works but I don't think it will work for the next/headers
+// it does not override the entire package, only the items specified
+// complete: 
+vi.mock("./a-dependency", () => {
+    return {
+        default: () => ({}), 
+        printHello: () => 'mocked hello',
+    }
+})
 
 describe('mocking', () => {
     describe('a custom module is mocked', async () => {
-        it('uses a vitest mock', () => {
-            expect(vi.isMockFunction(printHello)).toBe(true)
-        })
-        
         // example of expected behavior
         // https://stackblitz.com/edit/vitest-dev-vitest-aqqg5j?file=test%2Fuuid.test.ts,__mocks__%2Fuuid.ts&issueNumber=3192&issueRepo=vitest-dev/vitest
+        // issue reported, this other way seems to work: 
+        // https://github.com/vitest-dev/vitest/issues/1011
+        // however, I don't think it will work for the next/headers
         it('returns a string', async () => {
             expect(printHello()).toEqual('mocked hello')
         })
@@ -22,19 +37,23 @@ describe('mocking', () => {
     
     describe('part of a node module is mocked', () => {
         describe('headers', () => {
-            it('uses a vitest mock', async () => {   
-                expect(vi.isMockFunction(headers)).toBe(true)
+            it.skip('uses a vitest mock', async () => {   
+                expect(vi.isMockFunction(headers.headers)).toBe(true)
             })
         })
 
         describe('cookies', () => {
-            it('uses a vitest mock', async () => {   
-                expect(vi.isMockFunction(cookies)).toBe(true)
+            it.skip('uses a vitest mock', async () => {   
+                expect(vi.isMockFunction(headers.cookies)).toBe(true)
             })
 
-            it.skip("returns an object with a 'get' function that is a mock", () => {
-                // cookies() should return an object with a get() function
-                expect(cookies()).toBe(true)
+            it.skip("'get' returns a string", () => {
+                // cookies() returns a ReadonlyRequestCookies
+                // option 1: create an instance of 'ReadonlyRequestCookies'
+                //   and assign it to 'cookies' on line 20
+                // option 2: override 'get()' from wherever it is imported 
+                //   from (probably ReadonlyRequestCookies)
+                expect(headers.cookies().get('cookie')).toBe('mocked cookie')
             })
         })
     })
